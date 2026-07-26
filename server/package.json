@@ -12,7 +12,7 @@
     "import:2000": "tsx src/scripts/import.ts --model=alter-2000"
   },
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "better-sqlite3": "^13.0.1",
     "drizzle-orm": "^0.45.2",

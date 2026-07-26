@@ -59,3 +59,8 @@ parser (`server/src/import/parseMarkdown.ts`) has to account for:
   — it is not inferable from file order/naming alone.
 - Both `cod_ckd` and `cod_sobres` are equally valid searchable part codes; either, both, or
   neither may be populated on a given row.
+- `illustration-map.json`'s `13.2.C` entry (`1.jpg`) was assigned by elimination, not content
+  match — its content (a fuel-type tank/filter/hose assembly) doesn't obviously depict a brake
+  master cylinder, but all other 17 groups are confidently matched to the remaining 17 images by
+  content, leaving this pairing as the only mathematically consistent option. Worth a human
+  double-check against the original PDF if this group's illustration ever looks wrong in the UI.

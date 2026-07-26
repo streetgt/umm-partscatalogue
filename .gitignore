@@ -2,3 +2,6 @@ node_modules/
 .env
 .superpowers/
 .worktrees/
+dist/
+*.sqlite
+client/dist/

@@ -5,3 +5,4 @@ node_modules/
 dist/
 *.sqlite
 client/dist/
+server/public/images/

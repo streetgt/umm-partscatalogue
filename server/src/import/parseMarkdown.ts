@@ -116,7 +116,10 @@ function parsePartsTable(body: string): ParsedPart[] {
       if (key === "item") part.itemNumber = value;
       else if (key === "skip") return;
       else if (key === "designacao") part.designacao = value ?? "";
-      else if (key) part[key] = value;
+      else if (key === "codCkd") part.codCkd = value;
+      else if (key === "codSobres") part.codSobres = value;
+      else if (key === "coef") part.coef = value;
+      else if (key === "observacoes") part.observacoes = value;
     });
     return part;
   });

@@ -28,13 +28,20 @@ umm-partscatalogue/
 - **Brand** — `id, name, slug` (Cournil, Alter)
 - **Model** — `id, brand_id, name, slug, status` (`active` | `coming_soon`). Alter 2000 is the
   only `active` model initially.
-- **Group** — `id, model_id, code, name, illustration_file, sort_order`. A group represents one
-  parts-catalogue section (e.g. `00.1.D APOIOS MOTOR`). A group may have zero parts (image-only),
-  since the source data has at least one section (`13.2.C BOMBA CENTRAL TRAVÕES`) with an
-  illustration but no transcribed table.
-- **Part** — `id, group_id, item_number, cod_ckd, cod_sobres, designacao, coef, observacoes`.
-  Both `cod_ckd` and `cod_sobres` are treated as equally valid searchable part codes (per
-  source data, a part may have either, both, or neither populated).
+- **Group** — `id, model_id, code, name, illustration_file, sort_order, observacoes`. A group
+  represents one parts-catalogue section (e.g. `00.1.D APOIOS MOTOR`). A group may have zero
+  parts (image-only), since the source data has at least one section
+  (`13.2.C BOMBA CENTRAL TRAVÕES`) with an illustration but no transcribed table. `observacoes`
+  carries group-level notes from the source index (e.g. "DESENHO É ORIGINAL"), which would
+  otherwise have nowhere to live.
+- **Part** — `id, group_id, item_number, sort_order, cod_ckd, cod_sobres, designacao, coef,
+  observacoes`. Both `cod_ckd` and `cod_sobres` are treated as equally valid searchable part
+  codes (per source data, a part may have either, both, or neither populated; some codes are
+  wrapped in parentheses, e.g. `(0114001)`, which is stored as-is but stripped for search
+  matching). `sort_order` preserves the row's position in the source table independently of
+  `item_number`, since item numbers are not always monotonic (e.g. `03.1.D` lists items in the
+  order 1,2,3,4,5,8,6,7,9...) — display always uses `sort_order`, never a numeric sort on
+  `item_number`.
 
 Search matches against `designacao`, `cod_ckd`, and `cod_sobres`.
 
@@ -42,13 +49,27 @@ Search matches against `designacao`, `cod_ckd`, and `cod_sobres`.
 
 A re-runnable script (`server/scripts/import.ts`):
 
-1. Parses a model's source markdown (e.g. `resources/2000/2000.md`), splitting on `##` headers
-   into groups and parsing each group's table into `Part` rows.
-2. Reads a manually-authored `illustration-map.json` (group code → image filename) — this
+1. Enumerates the full set of groups from the **index table** at the top of the source markdown
+   (the `## ÍNDICE CATÁLOGO PEÇAS` section) — this is the authoritative list of all 18 groups,
+   including `13.2.C` which has no body section at all. The index also supplies each group's
+   `OBSERVAÇÕES` (e.g. "DESENHO É ORIGINAL"). Group names sometimes differ slightly in
+   spelling/accentuation between the index and the body section heading (e.g. "FILTRO GASOLEO"
+   vs "FILTRO GASÓLEO"); the body heading's spelling is treated as canonical for `Group.name`
+   when both exist, since it's the more fully-accented/corrected version.
+2. For each group code found in the index, looks for a matching `## <code> <name>` body section
+   (identified by the code pattern, e.g. `00.1.D`, at the start of the heading — not just any
+   `##` heading, since the file also contains non-group `##` sections: the index itself and the
+   trailing `## Ilustrações` block) and parses its table into `Part` rows if the section exists.
+   Column parsing is **header-driven, not positional** — table column order and naming vary
+   across sections (e.g. `16.1.C` reorders `DESIGNAÇÃO` after `OBSERVAÇÕES`, `16.2.E` uses
+   `QUANT.` instead of `COEF.`, `17.5.H` uses accented `CÓD. CKD`/`CÓD. SOBRES.`), so the parser
+   maps columns by matching header text (normalizing accents/case) rather than fixed position.
+   Each row's original position in the table is recorded as `sort_order`.
+3. Reads a manually-authored `illustration-map.json` (group code → image filename) — this
    mapping is **not** inferred automatically from file order, since the source illustrations
    don't map 1:1 in sequence with table sections (the `13.2.C`/`13.2.D` gap above). This map
    is verified by eye once per model.
-3. Copies referenced images into `server/public/images/<model>/` and re-seeds that model's
+4. Copies referenced images into `server/public/images/<model>/` and re-seeds that model's
    Brand/Model/Group/Part rows in SQLite (idempotent full replace per model, not additive).
 
 This keeps the source markdown as the reprocessable source of truth, and generalizes to future

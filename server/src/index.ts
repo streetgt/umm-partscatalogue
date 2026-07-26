@@ -14,6 +14,12 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+const clientDist = path.resolve(__dirname, "../../client/dist");
+app.use(express.static(clientDist));
+app.get(/^(?!\/api|\/images).*/, (_req, res) => {
+  res.sendFile(path.join(clientDist, "index.html"));
+});
+
 app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`);
 });

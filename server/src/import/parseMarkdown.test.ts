@@ -66,4 +66,22 @@ describe("parseCatalogueMarkdown", () => {
     expect(codes).not.toContain(undefined);
     expect(result.groups.every((g) => /^\d{2}\.\d\.[A-Z]$/.test(g.code))).toBe(true);
   });
+
+  it("throws on an unrecognized table header instead of silently skipping the column", () => {
+    const synthetic = `# Catálogo Sintético
+
+## ÍNDICE CATÁLOGO PEÇAS (XUD)
+
+| GRUPO | DESIGNAÇÃO | OBSERVAÇÕES |
+| --- | --- | --- |
+| 99.9.Z | PEÇA DE TESTE |  |
+
+## 99.9.Z PEÇA DE TESTE
+
+| ITEM | COD. CKD | COD. SOBRES. | DESIGNAÇÃO | PESO | OBSERVAÇÕES |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 123456W | 654321W | PARAFUSO | 1.2 |  |
+`;
+    expect(() => parseCatalogueMarkdown(synthetic)).toThrow(/PESO/);
+  });
 });

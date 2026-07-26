@@ -66,15 +66,12 @@ async function main() {
     .returning()
     .all();
 
-  const existingGroups = db.select().from(groups).where(eq(groups.modelId, model.id)).all();
-  for (const g of existingGroups) {
-    db.delete(parts).where(eq(parts.groupId, g.id)).run();
-  }
-  db.delete(groups).where(eq(groups.modelId, model.id)).run();
-
   const imagesDestDir = path.resolve(__dirname, `../../public/images/${config.modelSlug}`);
   mkdirSync(imagesDestDir, { recursive: true });
 
+  // Copy all illustration files up front, before any database mutation. If a
+  // referenced image file is missing, cpSync throws here and the transaction
+  // below is never entered, leaving the existing DB rows untouched.
   for (const group of parsed.groups) {
     const illustrationFile = illustrationMap[group.code] ?? null;
     if (illustrationFile) {
@@ -83,37 +80,49 @@ async function main() {
         path.join(imagesDestDir, illustrationFile),
       );
     }
-
-    const [insertedGroup] = db
-      .insert(groups)
-      .values({
-        modelId: model.id,
-        code: group.code,
-        name: group.name,
-        illustrationFile,
-        sortOrder: group.sortOrder,
-        observacoes: group.observacoes,
-      })
-      .returning()
-      .all();
-
-    if (group.parts.length > 0) {
-      db.insert(parts)
-        .values(
-          group.parts.map((p) => ({
-            groupId: insertedGroup.id,
-            itemNumber: p.itemNumber,
-            sortOrder: p.sortOrder,
-            codCkd: p.codCkd,
-            codSobres: p.codSobres,
-            designacao: p.designacao,
-            coef: p.coef,
-            observacoes: p.observacoes,
-          })),
-        )
-        .run();
-    }
   }
+
+  db.transaction((tx) => {
+    const existingGroups = tx.select().from(groups).where(eq(groups.modelId, model.id)).all();
+    for (const g of existingGroups) {
+      tx.delete(parts).where(eq(parts.groupId, g.id)).run();
+    }
+    tx.delete(groups).where(eq(groups.modelId, model.id)).run();
+
+    for (const group of parsed.groups) {
+      const illustrationFile = illustrationMap[group.code] ?? null;
+
+      const [insertedGroup] = tx
+        .insert(groups)
+        .values({
+          modelId: model.id,
+          code: group.code,
+          name: group.name,
+          illustrationFile,
+          sortOrder: group.sortOrder,
+          observacoes: group.observacoes,
+        })
+        .returning()
+        .all();
+
+      if (group.parts.length > 0) {
+        tx.insert(parts)
+          .values(
+            group.parts.map((p) => ({
+              groupId: insertedGroup.id,
+              itemNumber: p.itemNumber,
+              sortOrder: p.sortOrder,
+              codCkd: p.codCkd,
+              codSobres: p.codSobres,
+              designacao: p.designacao,
+              coef: p.coef,
+              observacoes: p.observacoes,
+            })),
+          )
+          .run();
+      }
+    }
+  });
 
   console.log(`Imported ${parsed.groups.length} groups for ${config.brandName} ${config.modelName}.`);
 }

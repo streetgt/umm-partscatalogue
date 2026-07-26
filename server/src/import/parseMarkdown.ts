@@ -96,9 +96,18 @@ function parseIndexTable(body: string): Map<string, { name: string; observacoes:
   return map;
 }
 
-function parsePartsTable(body: string): ParsedPart[] {
+function parsePartsTable(body: string, sectionLabel: string): ParsedPart[] {
   const { headers, rows } = parseTable(body.split("\n"));
   const keyByIndex = headers.map(resolveHeaderKey);
+
+  headers.forEach((rawHeader, i) => {
+    if (keyByIndex[i] === "skip") {
+      throw new Error(
+        `Unrecognized table header "${rawHeader}" in section "${sectionLabel}". ` +
+          `Add it to HEADER_ALIASES if it maps to a known field, or to the allowlist if it should be ignored.`,
+      );
+    }
+  });
 
   return rows.map((row, index) => {
     const part: ParsedPart = {
@@ -153,7 +162,7 @@ export function parseCatalogueMarkdown(source: string): ParsedCatalogue {
       const heading = bodySection.split("\n")[0].replace(/^##\s*/, "").trim();
       const match = heading.match(GROUP_CODE_PATTERN);
       if (match) name = match[2].trim();
-      parts = parsePartsTable(bodySection);
+      parts = parsePartsTable(bodySection, heading);
     }
     groups.push({
       code,

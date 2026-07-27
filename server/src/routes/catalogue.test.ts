@@ -51,4 +51,20 @@ describe("GET /api/search", () => {
     expect(res.status).toBe(200);
     expect(res.body.length).toBeGreaterThan(0);
   });
+
+  it("treats a literal % as a literal character, not a wildcard", async () => {
+    const res = await request(app).get("/api/search").query({ q: "%" });
+    expect(res.status).toBe(200);
+    // No seeded designacao/cod_ckd/cod_sobres actually contains a literal
+    // "%", so an escaped search must return no rows instead of the whole
+    // dataset (which is what an unescaped LIKE wildcard would return).
+    expect(res.body).toHaveLength(0);
+  });
+
+  it("treats a literal _ as a literal character, not a single-char wildcard", async () => {
+    const res = await request(app).get("/api/search").query({ q: "_" });
+    expect(res.status).toBe(200);
+    // Same reasoning as the "%" case above for "_".
+    expect(res.body).toHaveLength(0);
+  });
 });

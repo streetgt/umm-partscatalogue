@@ -1,7 +1,17 @@
 import { Router } from "express";
-import { eq, and, or, like } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { brands, models, groups, parts } from "../db/schema.js";
+
+/**
+ * Escapes SQL LIKE metacharacters (\, %, _) in a raw user-supplied string so
+ * it can be safely embedded in a LIKE pattern with `ESCAPE '\'`. The
+ * backslash must be escaped first, otherwise the escape characters we add
+ * for % and _ would themselves be re-escaped.
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
 
 export const catalogueRouter = Router();
 
@@ -60,7 +70,7 @@ catalogueRouter.get("/brands/:brandSlug/models/:modelSlug/groups/:code", (req, r
 catalogueRouter.get("/search", (req, res) => {
   const q = String(req.query.q ?? "").trim();
   if (!q) return res.json([]);
-  const pattern = `%${q}%`;
+  const pattern = `%${escapeLikePattern(q)}%`;
   const rows = db
     .select({
       part: parts,
@@ -73,11 +83,7 @@ catalogueRouter.get("/search", (req, res) => {
     .innerJoin(models, eq(groups.modelId, models.id))
     .innerJoin(brands, eq(models.brandId, brands.id))
     .where(
-      or(
-        like(parts.designacao, pattern),
-        like(parts.codCkd, pattern),
-        like(parts.codSobres, pattern),
-      ),
+      sql`(${parts.designacao} LIKE ${pattern} ESCAPE '\\') OR (${parts.codCkd} LIKE ${pattern} ESCAPE '\\') OR (${parts.codSobres} LIKE ${pattern} ESCAPE '\\')`,
     )
     .limit(50)
     .all();
